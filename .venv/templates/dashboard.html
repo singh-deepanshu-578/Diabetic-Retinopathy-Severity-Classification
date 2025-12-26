@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard - DR Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#fff; --accent1:#0ea5ff; --accent2:#0066cc;
+      --muted:#667085; --radius:12px; --good:#1b8750; --warn:#f59e0b; --bad:#c9343f;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:#0f1724 }
+    header{ background:linear-gradient(90deg,var(--accent1),var(--accent2)); color:white; padding:18px 32px }
+    .container{ max-width:1100px; margin:28px auto; padding:0 20px }
+    .card{ background:var(--card); border-radius:var(--radius); box-shadow:0 8px 20px rgba(13,38,59,0.06); padding:18px }
+    .grid{ display:grid; grid-template-columns: 1fr 320px; gap:20px }
+    .overview{ display:flex; gap:12px }
+    .stat{ flex:1; background:linear-gradient(180deg,#fff,#fbfdff); padding:14px; border-radius:10px }
+    .title{ font-size:18px; font-weight:700; margin-bottom:8px }
+    .muted{ color:var(--muted) }
+    .btn{ padding:10px 12px; border-radius:8px; border:none; font-weight:700; color:white; background:linear-gradient(90deg,var(--accent1),var(--accent2)); cursor:pointer }
+    table{ width:100%; border-collapse:collapse }
+    th,td{ text-align:left; padding:10px; border-bottom:1px solid #eef2f7 }
+    @media (max-width:900px){ .grid{ grid-template-columns:1fr } }
+
+    /* result area */
+    .result-wrap{ margin-top:18px; display:flex; gap:18px; align-items:flex-start; }
+    .preview{
+      width:220px; height:220px; background:#f8fafc; border-radius:12px; display:flex;align-items:center;justify-content:center; overflow:hidden;
+      border:1px solid #eef2f7;
+    }
+    .preview img{ max-width:100%; max-height:100%; object-fit:contain; display:block }
+
+    .result-card{
+      flex:1; min-height:120px; background:linear-gradient(180deg,#fff,#fbfdff); border-radius:12px; padding:14px; display:flex;flex-direction:column; gap:8px;
+      box-shadow:0 6px 18px rgba(6,34,77,0.06);
+    }
+    .severity-badge{ display:inline-block; padding:8px 12px; border-radius:999px; color:white; font-weight:700 }
+    .severity-0{ background:var(--good) } /* No DR / Normal */
+    .severity-1{ background:#06b6d4 } /* Mild - teal */
+    .severity-2{ background:var(--warn) } /* Moderate */
+    .severity-3{ background:#d97706 } /* Severe */
+    .severity-4{ background:var(--bad) } /* Proliferative or critical */
+
+    .result-row{ display:flex; gap:12px; align-items:center; justify-content:flex-start; flex-wrap:wrap }
+    .small-muted{ color:var(--muted); font-size:14px }
+
+    /* small top-right result notification (optional) */
+    .top-result{
+      position:fixed; right:20px; top:20px; background:rgba(2,47,111,0.95); color:white; padding:10px 14px; border-radius:8px; z-index:9999; display:none;
+    }
+
+    /* table highlight new row */
+    .new-row { background: linear-gradient(90deg,#fffef0,#fbfff8); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-weight:800; font-size:20px">DR Analyzer</div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button id="btn-new" class="btn">New Analysis</button>
+          <button id="btn-signout" class="btn" style="background:transparent;border:1px solid rgba(255,255,255,0.2)">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="grid" style="margin-bottom:18px">
+      <div>
+        <div class="card">
+          <div class="title">Recent scans</div>
+          <table id="scans-table">
+            <thead><tr><th>File</th><th>Date</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>eye_001.jpg</td><td>2025-10-12</td><td><strong>Moderate</strong></td></tr>
+              <tr><td>eye_002.jpg</td><td>2025-09-21</td><td><strong>Mild</strong></td></tr>
+            </tbody>
+          </table>
+
+          <!-- Result + Preview block -->
+          <div id="result-area" class="result-wrap" style="display:none">
+            <div class="preview" id="img-preview"><span class="small-muted">No preview</span></div>
+            <div class="result-card" id="result-card">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div class="small-muted">Analysis result</div>
+                  <div id="severity-text" style="font-size:20px;font-weight:800;margin-top:6px">—</div>
+                </div>
+                <div id="severity-badge" class="severity-badge severity-0">—</div>
+              </div>
+              <div id="additional-info" class="small-muted">No details yet</div>
+              <div style="margin-top:auto; display:flex; gap:8px;">
+                <button id="save-btn" class="btn" style="width:auto;padding:8px 12px">Save result</button>
+                <button id="re-run" class="btn" style="background:transparent;color:var(--accent2);border:1px solid #e6ecf8">Re-run</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:18px"></div>
+        <div class="card">
+          <div class="title">Statistics</div>
+          <div class="overview">
+            <div class="stat"><div style="font-size:26px; font-weight:800">124</div><div class="muted">Analyses this month</div></div>
+            <div class="stat"><div style="font-size:26px; font-weight:800">19</div><div class="muted">Abnormal findings</div></div>
+            <div class="stat"><div style="font-size:26px; font-weight:800">3</div><div class="muted">Saved reports</div></div>
+          </div>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card">
+          <div class="title">Account</div>
+          <div class="muted">Username: demo_user</div>
+          <div style="height:12px"></div>
+          <div class="muted">Plan: Free</div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="card">
+          <div class="title">Quick actions</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <button id="btn-upload" class="btn">Upload image</button>
+            <button id="btn-viewall" class="btn" style="background:#f5f7fb;color:var(--accent2);box-shadow:none;border:1px solid #e6ecf8">View all</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- hidden file input -->
+  <input id="file-picker" type="file" accept="image/*" style="display:none" />
+
+  <div class="top-result" id="top-result">Result shown</div>
+
+<script>
+/* --- Helper UI & mapping --- */
+const btnNew = document.getElementById('btn-new');
+const btnUpload = document.getElementById('btn-upload');
+const btnViewAll = document.getElementById('btn-viewall');
+const btnSignout = document.getElementById('btn-signout');
+const filePicker = document.getElementById('file-picker');
+const resultArea = document.getElementById('result-area');
+const imgPreview = document.getElementById('img-preview');
+const severityText = document.getElementById('severity-text');
+const severityBadge = document.getElementById('severity-badge');
+const additionalInfo = document.getElementById('additional-info');
+const scansTable = document.getElementById('scans-table').querySelector('tbody');
+const topResult = document.getElementById('top-result');
+const saveBtn = document.getElementById('save-btn');
+const reRunBtn = document.getElementById('re-run');
+
+const severityMap = {
+  0: { label: "No DR", cls: "severity-0", color: "#1b8750" },
+  1: { label: "Mild DR", cls: "severity-1", color: "#06b6d4" },
+  2: { label: "Moderate DR", cls: "severity-2", color: "#f59e0b" },
+  3: { label: "Severe DR", cls: "severity-3", color: "#d97706" },
+  4: { label: "Proliferative DR", cls: "severity-4", color: "#c9343f" }
+};
+
+function showTopResult(msg, timeout=3000){
+  topResult.textContent = msg;
+  topResult.style.display = 'block';
+  setTimeout(()=> { topResult.style.display='none'; }, timeout);
+}
+
+/* --- Upload logic --- */
+btnNew.addEventListener('click', () => filePicker.click());
+btnUpload.addEventListener('click', () => filePicker.click());
+
+filePicker.addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+
+  // show preview immediately
+  const objectUrl = URL.createObjectURL(file);
+  imgPreview.innerHTML = '';
+  const imgEl = document.createElement('img');
+  imgEl.src = objectUrl;
+  imgPreview.appendChild(imgEl);
+
+  resultArea.style.display = 'flex';
+  severityText.textContent = 'Analyzing...';
+  severityBadge.textContent = 'Please wait';
+  severityBadge.className = 'severity-badge severity-0';
+  additionalInfo.textContent = 'Uploading image to server...';
+
+  // prepare formdata and upload
+  const fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    const resp = await fetch('/predict', { method: 'POST', body: fd });
+    if(!resp.ok){
+      additionalInfo.textContent = 'Server returned: ' + resp.statusText;
+      showTopResult('Upload failed: ' + resp.status, 3000);
+      return;
+    }
+    const json = await resp.json();
+    // expected keys: dr_detected (bool), severity (string), severity_level (int), optionally confidence
+    const detected = json.dr_detected ?? (json.severity_level > 0);
+    const severityLabel = json.severity ?? (severityMap[json.severity_level]?.label ?? 'Unknown');
+    const level = Number.isFinite(json.severity_level) ? json.severity_level : (detected ? 2 : 0);
+    const conf = json.confidence ?? json.score ?? null;
+
+    // update UI
+    severityText.textContent = severityLabel;
+    const map = severityMap[level] || severityMap[0];
+    severityBadge.className = 'severity-badge ' + map.cls;
+    severityBadge.textContent = map.label;
+
+    additionalInfo.textContent = `DR detected: ${detected ? 'Yes' : 'No'}${conf ? ' • Confidence: ' + (Math.round(conf*100) + '%') : ''}`;
+
+    showTopResult('Result: ' + severityLabel, 3000);
+
+    // add to recent scans table (prepend)
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0,10);
+    const newRow = document.createElement('tr');
+    newRow.classList.add('new-row');
+    const filename = file.name;
+    newRow.innerHTML = `<td>${escapeHtml(filename)}</td><td>${dateStr}</td><td><strong>${escapeHtml(severityLabel)}</strong></td>`;
+    scansTable.prepend(newRow);
+
+    // attach save and rerun handlers
+    saveBtn.onclick = () => {
+      // simple client-side feedback; ideally call backend to persist
+      showTopResult('Saved result for ' + filename, 2000);
+    };
+    reRunBtn.onclick = async () => {
+      showTopResult('Re-running analysis...', 1500);
+      // re-run: simply call predict again with same file blob (or call backend by filename if stored)
+      // here: we'll re-upload the same file (if object URL available)
+      try {
+        const fd2 = new FormData();
+        fd2.append('file', file);
+        const r2 = await fetch('/predict', { method: 'POST', body: fd2 });
+        if(r2.ok){ showTopResult('Re-run done', 1500); } else { showTopResult('Re-run failed', 2000); }
+      } catch(err){ showTopResult('Re-run error', 2000); }
+    };
+
+  } catch(err) {
+    console.error('Upload error', err);
+    additionalInfo.textContent = 'Upload failed — backend not reachable';
+    showTopResult('Upload failed — backend not reachable', 2500);
+  } finally {
+    // clear file input so same file can be selected again
+    filePicker.value = '';
+    // revoke object URL after a while to free memory
+    setTimeout(()=> URL.revokeObjectURL(objectUrl), 60000);
+  }
+});
+
+/* --- helpers & other buttons --- */
+btnViewAll.addEventListener('click', () => {
+  fetch('/scans', { method: 'HEAD' }).then(r => {
+    if(r.ok) location.href = '/scans'; else location.href = '/dashboard';
+  }).catch(()=> location.href = '/dashboard');
+});
+btnSignout.addEventListener('click', ()=> location.href = '/logout');
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
