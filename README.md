@@ -35,21 +35,25 @@ The primary model is a 2D CNN consisting of:
 - **Regularization**: Dropout (0.5) to prevent overfitting.
 - **Output**: A Softmax layer for 5-class classification.
 
-## 📁 Project Structure
+## Project Structure
+📁 DIABETIC_RETINOPATHY/
+│
+├── 📁 .qodo/                     # Project configuration / metadata
+├── 📁 .venv/                     # Python virtual environment
+│
+├── 📁 templates/                 # HTML templates for the web interface
+│   ├── dashboard.html            # User dashboard after login
+│   ├── login.html                # User login page
+│   └── register.html             # User registration page
+│
+├── .gitattributes                # Git configuration attributes
+├── app.py                        # Main Flask application file
+├── cnn_model_1.h5                # Trained CNN model for prediction
+├── diabetic-retinopathy-final.ipynb  # Jupyter notebook for model training & evaluation
+├── images.csv                    # CSV containing image paths and labels
+├── train.csv                     # Training dataset metadata
+├── README.md                     # Project documentation
 
-## 📁 Project Structure
-
-.
-├── templates/
-│ ├── dashboard.html
-│ ├── login.html
-│ └── register.html
-├── .gitattributes
-├── app.py
-├── cnn_model_1.h5
-├── diabetic-retinopathy-final.ipynb
-├── images.csv
-└── train.csv
 
 ## 💻 Installation & Usage
 
