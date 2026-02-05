@@ -61,7 +61,7 @@ The primary model is a 2D CNN consisting of:
 
 1. **Clone the repository**:
    ```bash
-   git clone [https://github.com/singh-deepanshu-578/diabetic-retinopathy-severity-classification.git](https://github.com/singh-deepanshu-578/diabetic-retinopathy-severity-classification.git)
+   git clone https://github.com/singh-deepanshu-578/diabetic-retinopathy-severity-classification.git
    cd diabetic-retinopathy-severity-classification
    ```
 2. **Install dependencies:**Ensure you have Python installed, then run:
