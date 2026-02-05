@@ -37,16 +37,18 @@ The primary model is a 2D CNN consisting of:
 
 ## 📁 Project Structure
 
+## 📁 Project Structure
+
 .
+├── templates/
+│ ├── dashboard.html
+│ ├── login.html
+│ └── register.html
 ├── .gitattributes
 ├── app.py
 ├── cnn_model_1.h5
 ├── diabetic-retinopathy-final.ipynb
 ├── images.csv
-├── templates/
-│ ├── dashboard.html
-│ ├── login.html
-│ └── register.html
 └── train.csv
 
 ## 💻 Installation & Usage
