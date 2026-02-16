@@ -18,7 +18,7 @@ app.config['SECRET_KEY'] = 'your_super_secret_key_change_this'
 # Configure the SQLite database
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'site.db')
 # Format: 'mysql://USERNAME:PASSWORD@HOST/DATABASE_NAME'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:password@root/database_name'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:1234@localhost/dr_analyzer'
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -52,7 +52,7 @@ class Prediction(db.Model):
 
 
 # --- Load The AI Model (Do this once) ---
-model = tf.keras.models.load_model('cnn_model_1.h5')
+model = tf.keras.models.load_model('cnn_model_1.h5',compile=False)
 print("Model loaded successfully.")
 
 # Map for severity classes
