@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+import base64
 import json
 import os
 from datetime import datetime
@@ -77,10 +78,65 @@ SEVERITY_CLASSES = {
     4: "Proliferative DR"
 }
 
+def severity_from_scores(scores):
+    if isinstance(scores, dict):
+        scores = [{'label': label, 'score': score} for label, score in scores.items()]
+    if not isinstance(scores, list) or not scores:
+        raise RuntimeError('Inference API returned no classifications')
+
+    best = max(scores, key=lambda item: float(item.get('score', 0)))
+    label = str(best.get('label', '')).strip().lower()
+    for level, severity in SEVERITY_CLASSES.items():
+        if (
+            label in {str(level), severity.lower()}
+            or severity.lower() in label
+            or label.endswith(f'_{level}')
+            or label.endswith(f' {level}')
+        ):
+            return level, severity
+    raise RuntimeError(f'Inference API returned unknown class label: {label}')
+
+def predict_from_gradio(image_bytes, content_type, space_url):
+    data_url = (
+        f'data:{content_type or "application/octet-stream"};base64,'
+        f'{base64.b64encode(image_bytes).decode("ascii")}'
+    )
+    submit_request = Request(
+        f'{space_url.rstrip("/")}/call/predict',
+        data=json.dumps({'data': [data_url]}).encode('utf-8'),
+        headers={'Content-Type': 'application/json'},
+        method='POST'
+    )
+    try:
+        with urlopen(submit_request, timeout=30) as response:
+            event_id = json.loads(response.read().decode('utf-8')).get('event_id')
+        if not event_id:
+            raise RuntimeError('Gradio API did not return an event ID')
+
+        with urlopen(
+            Request(f'{space_url.rstrip("/")}/call/predict/{event_id}'),
+            timeout=60
+        ) as response:
+            for line in response.read().decode('utf-8').splitlines():
+                if line.startswith('data: '):
+                    result = json.loads(line[6:])
+                    output = result[0] if isinstance(result, list) else result
+                    return severity_from_scores(output)
+    except HTTPError as error:
+        details = error.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f'Gradio API returned HTTP {error.code}: {details}') from error
+    except URLError as error:
+        raise RuntimeError(f'Gradio API request failed: {error.reason}') from error
+    raise RuntimeError('Gradio API returned no prediction')
+
 def predict_severity(image_bytes, content_type):
+    gradio_space_url = os.getenv('GRADIO_SPACE_URL')
+    if gradio_space_url:
+        return predict_from_gradio(image_bytes, content_type, gradio_space_url)
+
     inference_url = os.getenv('INFERENCE_API_URL')
     if not inference_url:
-        raise RuntimeError('INFERENCE_API_URL is not configured')
+        raise RuntimeError('GRADIO_SPACE_URL is not configured')
 
     headers = {'Content-Type': content_type or 'application/octet-stream'}
     inference_token = os.getenv('INFERENCE_API_TOKEN') or os.getenv('HF_TOKEN')
@@ -99,21 +155,8 @@ def predict_severity(image_bytes, content_type):
 
     if isinstance(result, dict) and result.get('error'):
         raise RuntimeError(f'Inference API error: {result["error"]}')
-    if not isinstance(result, list) or not result:
-        raise RuntimeError('Inference API returned no classifications')
-
-    scores = result[0] if isinstance(result[0], list) else result
-    best = max(scores, key=lambda item: float(item.get('score', 0)))
-    label = str(best.get('label', '')).strip().lower()
-    for level, severity in SEVERITY_CLASSES.items():
-        if (
-            label in {str(level), severity.lower()}
-            or severity.lower() in label
-            or label.endswith(f'_{level}')
-            or label.endswith(f' {level}')
-        ):
-            return level, severity
-    raise RuntimeError(f'Inference API returned unknown class label: {label}')
+    scores = result[0] if isinstance(result, list) and result and isinstance(result[0], list) else result
+    return severity_from_scores(scores)
 
 def initialize_database():
     with app.app_context():
