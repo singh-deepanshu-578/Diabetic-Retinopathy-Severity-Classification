@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Dashboard - DR Analyzer</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <style>
     :root {
       --bg: #f8fafc; --card: #ffffff; --accent: #0f172a; --primary: #0066cc;
@@ -325,6 +326,7 @@ const severityMap = {
   3: { label: "Severe DR", cls: "severity-3" },
   4: { label: "Proliferative DR", cls: "severity-4" }
 };
+const modelPromise = tf.loadLayersModel('/model/model.json');
 
 /* --- 2. Profile Dropdown Logic --- */
 if (profileTrigger && dropdownMenu) {
@@ -360,36 +362,40 @@ filePicker.addEventListener('change', async (e) => {
   severityBadge.textContent = 'Wait...';
   additionalInfo.textContent = 'Processing image...';
 
-  const fd = new FormData();
-  fd.append('file', file);
-
   try {
-    const resp = await fetch('/predict', { method: 'POST', body: fd });
-    
-    if(!resp.ok) {
-        const err = await resp.json();
-        additionalInfo.textContent = err.error || 'Invalid Image';
-        severityText.textContent = "Error";
-        severityBadge.textContent = "Rejected";
-        severityBadge.className = 'severity-badge severity-4';
-        return;
-    }
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
 
-    const json = await resp.json();
-    const level = json.severity_level;
+    const input = tf.tidy(() => tf.browser
+      .fromPixels(image)
+      .resizeBilinear([224, 224])
+      .toFloat()
+      .div(255)
+      .expandDims(0));
+    const model = await modelPromise;
+    const prediction = model.predict(input);
+    const scores = await prediction.data();
+    input.dispose();
+    prediction.dispose();
+
+    const level = scores.indexOf(Math.max(...scores));
     const map = severityMap[level] || severityMap[0];
 
-    additionalInfo.textContent = `DR Detected: ${json.dr_detected ? 'Yes' : 'No'}`;
+    additionalInfo.textContent = `DR Detected: ${level === 0 ? 'No' : 'Yes'}`;
     severityText.textContent = map.label;
     severityText.className = 'severity-badge ' + map.cls;
 
     // Recent Scans Table mein add karein
     const row = scansTable.insertRow(0);
-    row.innerHTML = `<td>${file.name}</td><td>${new Date().toLocaleDateString()}</td><td><strong>${json.severity}</strong></td>`;
+    row.innerHTML = `<td>${file.name}</td><td>${new Date().toLocaleDateString()}</td><td><strong>${map.label}</strong></td>`;
 
   } catch(err) {
     console.error(err);
-    additionalInfo.textContent = 'Connection Error';
+    additionalInfo.textContent = err.message || 'Model inference failed';
+    severityText.textContent = "Error";
+    severityBadge.textContent = "Rejected";
+    severityBadge.className = 'severity-badge severity-4';
   } finally {
     filePicker.value = ''; // Input clear karein
   }
