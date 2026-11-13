@@ -289,8 +289,8 @@
         <div class="card">
           <div class="title">Quick actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-            <button id="btn-upload" class="btn">Upload image</button>
-            <button id="btn-viewall" class="btn" style="background:#f5f7fb;color:var(--accent2);box-shadow:none;border:1px solid #e6ecf8">View all</button>
+            <button type="button" id="btn-upload" class="btn">Upload image</button>
+            <button type="button" id="btn-viewall" class="btn" style="background:#f5f7fb;color:var(--accent2);box-shadow:none;border:1px solid #e6ecf8">View all</button>
           </div>
         </div>
       </aside>
@@ -327,19 +327,25 @@ const severityMap = {
   4: { label: "Proliferative DR", cls: "severity-4" }
 };
 let modelLoadProgress = 0;
-const modelPromise = Promise.race([
-  tf.loadLayersModel('/model/model.json', {
-    onProgress: (progress) => {
-      modelLoadProgress = Math.round(progress * 100);
-      if (resultArea.style.display !== 'none') {
-        additionalInfo.textContent = `Downloading model... ${modelLoadProgress}%`;
-      }
-    }
-  }),
-  new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Model download timed out after 3 minutes. Check your connection and try again.')), 180000);
-  })
-]);
+let modelPromise;
+function getModelPromise() {
+  if (!modelPromise) {
+    modelPromise = Promise.race([
+      tf.loadLayersModel('/model/model.json', {
+        onProgress: (progress) => {
+          modelLoadProgress = Math.round(progress * 100);
+          if (resultArea.style.display !== 'none') {
+            additionalInfo.textContent = `Downloading model... ${modelLoadProgress}%`;
+          }
+        }
+      }),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Model download timed out after 3 minutes. Check your connection and try again.')), 180000);
+      })
+    ]);
+  }
+  return modelPromise;
+}
 
 /* --- 2. Profile Dropdown Logic --- */
 if (profileTrigger && dropdownMenu) {
@@ -389,7 +395,7 @@ filePicker.addEventListener('change', async (e) => {
     if (modelLoadProgress > 0 && modelLoadProgress < 100) {
       additionalInfo.textContent = `Loading model... ${modelLoadProgress}%`;
     }
-    const model = await modelPromise;
+    const model = await getModelPromise();
     const prediction = model.predict(input);
     const scores = await prediction.data();
     input.dispose();
