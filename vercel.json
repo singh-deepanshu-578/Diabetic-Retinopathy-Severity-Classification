@@ -1,11 +1,5 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/api/proxy?path=/" },
-    { "source": "/register", "destination": "/api/proxy?path=/register" },
-    { "source": "/login", "destination": "/api/proxy?path=/login" },
-    { "source": "/logout", "destination": "/api/proxy?path=/logout" },
-    { "source": "/dashboard", "destination": "/api/proxy?path=/dashboard" },
-    { "source": "/predict", "destination": "/api/proxy?path=/predict" },
-    { "source": "/healthz", "destination": "/api/proxy?path=/healthz" }
+    { "source": "/(.*)", "destination": "/api/index.py" }
   ]
 }

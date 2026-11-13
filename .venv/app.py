@@ -1,11 +1,11 @@
-import tensorflow as tf
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash, get_flashed_messages
 
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
-import cv2
-import numpy as np
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -68,11 +68,6 @@ class Prediction(db.Model):
         return f"Prediction('{self.result_text}' at {self.timestamp})"
 
 
-# --- Load The AI Model (Do this once) ---
-model_path = Path(__file__).resolve().parent / 'cnn_model_1.h5'
-model = tf.keras.models.load_model(model_path)
-print("Model loaded successfully.")
-
 # Map for severity classes
 SEVERITY_CLASSES = {
     0: "No DR",
@@ -82,37 +77,43 @@ SEVERITY_CLASSES = {
     4: "Proliferative DR"
 }
 
-# --- Image Preprocessing Function ---
-IMG_SIZE = 224
-def preprocess_image(image_bytes):
-    img = tf.image.decode_image(image_bytes, channels=3)
-    img = tf.image.resize(img, [IMG_SIZE, IMG_SIZE])
-    img = img / 255.0  # Normalize
-    return tf.expand_dims(img, axis=0) # Add batch dimension
+def predict_severity(image_bytes, content_type):
+    inference_url = os.getenv('INFERENCE_API_URL')
+    if not inference_url:
+        raise RuntimeError('INFERENCE_API_URL is not configured')
 
-def is_valid_retina(image_bytes):
-    # Bytes ko OpenCV image mein convert karein
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    if img is None:
-        return False
+    headers = {'Content-Type': content_type or 'application/octet-stream'}
+    inference_token = os.getenv('INFERENCE_API_TOKEN') or os.getenv('HF_TOKEN')
+    if inference_token:
+        headers['Authorization'] = f'Bearer {inference_token}'
 
-    # 1. Darkness Check (Certificate white hota hai, Retina dark)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    mean_brightness = np.mean(gray)
-    
-    # Agar image bahut bright hai (mean > 180), toh wo retina nahi hai
-    if mean_brightness > 180:
-        return False
+    request = Request(inference_url, data=image_bytes, headers=headers, method='POST')
+    try:
+        with urlopen(request, timeout=60) as response:
+            result = json.loads(response.read().decode('utf-8'))
+    except HTTPError as error:
+        details = error.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f'Inference API returned HTTP {error.code}: {details}') from error
+    except URLError as error:
+        raise RuntimeError(f'Inference API request failed: {error.reason}') from error
 
-    # 2. Red Channel Dominance (Retina mein Red color sabse zyada hota hai)
-    # BGR format: 0=Blue, 1=Green, 2=Red
-    avg_color = np.mean(img, axis=(0, 1))
-    if avg_color[2] < avg_color[0] or avg_color[2] < avg_color[1]:
-        return False
+    if isinstance(result, dict) and result.get('error'):
+        raise RuntimeError(f'Inference API error: {result["error"]}')
+    if not isinstance(result, list) or not result:
+        raise RuntimeError('Inference API returned no classifications')
 
-    return True
+    scores = result[0] if isinstance(result[0], list) else result
+    best = max(scores, key=lambda item: float(item.get('score', 0)))
+    label = str(best.get('label', '')).strip().lower()
+    for level, severity in SEVERITY_CLASSES.items():
+        if (
+            label in {str(level), severity.lower()}
+            or severity.lower() in label
+            or label.endswith(f'_{level}')
+            or label.endswith(f' {level}')
+        ):
+            return level, severity
+    raise RuntimeError(f'Inference API returned unknown class label: {label}')
 
 # --- Page Routes (URLs) ---
 
@@ -203,16 +204,13 @@ def predict():
 
     if file:
         image_bytes = file.read()
-        if not is_valid_retina(image_bytes):
-            return jsonify({
-                'error': 'Invalid Image! Please upload a proper eye fundus scan.',
-                'dr_detected': False
-            }), 400
-        processed_image = preprocess_image(image_bytes)
-        prediction_array = model.predict(processed_image)
-        
-        predicted_class_index = np.argmax(prediction_array[0])
-        severity_name = SEVERITY_CLASSES[predicted_class_index]
+        try:
+            predicted_class_index, severity_name = predict_severity(
+                image_bytes,
+                file.mimetype
+            )
+        except RuntimeError as error:
+            return jsonify({'error': str(error)}), 502
         is_dr_detected = (predicted_class_index != 0)
         
         # --- SAVE TO DATABASE ---
