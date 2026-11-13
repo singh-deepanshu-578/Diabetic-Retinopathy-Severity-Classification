@@ -115,6 +115,10 @@ def predict_severity(image_bytes, content_type):
             return level, severity
     raise RuntimeError(f'Inference API returned unknown class label: {label}')
 
+def initialize_database():
+    with app.app_context():
+        db.create_all()
+
 # --- Page Routes (URLs) ---
 
 @app.route("/")
@@ -132,6 +136,7 @@ def healthz():
 @app.route("/register", methods=['GET','POST'])
 def register():
     if request.method == 'POST':
+        initialize_database()
         username = request.form['username']
         password = request.form['password']
         existing_user = User.query.filter_by(username=username).first()
@@ -150,6 +155,7 @@ def register():
 
 @app.route("/login", methods=['POST'])
 def login():
+    initialize_database()
     username = request.form['username']
     password = request.form['password']
     
@@ -180,6 +186,7 @@ def dashboard():
         return redirect(url_for('home'))
     
     # Get the user's past predictions from the database
+    initialize_database()
     user_id = session['user_id']
     predictions = Prediction.query.filter_by(user_id=user_id).order_by(Prediction.timestamp.desc()).all()
     
@@ -195,6 +202,7 @@ def predict():
     if 'user_id' not in session:
         return jsonify({'error': 'User not logged in'}), 401 # 401 is "Unauthorized"
 
+    initialize_database()
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     
@@ -230,10 +238,6 @@ def predict():
             'severity': severity_name,
             'severity_level': int(predicted_class_index)
         })
-
-# Create tables for both local development and Cloud Run startup.
-with app.app_context():
-    db.create_all()
 
 # --- Run the App ---
 if __name__ == '__main__':
