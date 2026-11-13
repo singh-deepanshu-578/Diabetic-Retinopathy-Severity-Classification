@@ -326,7 +326,20 @@ const severityMap = {
   3: { label: "Severe DR", cls: "severity-3" },
   4: { label: "Proliferative DR", cls: "severity-4" }
 };
-const modelPromise = tf.loadLayersModel('/model/model.json');
+let modelLoadProgress = 0;
+const modelPromise = Promise.race([
+  tf.loadLayersModel('/model/model.json', {
+    onProgress: (progress) => {
+      modelLoadProgress = Math.round(progress * 100);
+      if (resultArea.style.display !== 'none') {
+        additionalInfo.textContent = `Downloading model... ${modelLoadProgress}%`;
+      }
+    }
+  }),
+  new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Model download timed out after 3 minutes. Check your connection and try again.')), 180000);
+  })
+]);
 
 /* --- 2. Profile Dropdown Logic --- */
 if (profileTrigger && dropdownMenu) {
@@ -373,6 +386,9 @@ filePicker.addEventListener('change', async (e) => {
       .toFloat()
       .div(255)
       .expandDims(0));
+    if (modelLoadProgress > 0 && modelLoadProgress < 100) {
+      additionalInfo.textContent = `Loading model... ${modelLoadProgress}%`;
+    }
     const model = await modelPromise;
     const prediction = model.predict(input);
     const scores = await prediction.data();
