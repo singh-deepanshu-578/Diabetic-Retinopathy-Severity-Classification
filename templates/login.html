@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login - DR Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+        --primary: #0066cc;
+        --secondary: #0ea5ff;
+        --bg: #f0f4f8;
+        --text: #1a202c;
+    }
+    body { 
+        font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+        background: radial-gradient(circle at top left, #e0e7ff, #f0f4f8);
+        margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+    .container { width: 100%; max-width: 440px; padding: 20px; }
+    .card { 
+        background: rgba(255, 255, 255, 0.9); 
+        backdrop-filter: blur(10px);
+        border-radius: 20px; padding: 40px; 
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05); 
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: transform 0.3s ease;
+    }
+    .card:hover { transform: translateY(-5px); }
+    h1 { margin: 0 0 10px; font-size: 32px; color: var(--primary); font-weight: 800; letter-spacing: -1px; }
+    p.lead { color: #64748b; margin-bottom: 30px; font-size: 15px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #475569; font-size: 14px; }
+    input { 
+        width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 12px; 
+        margin-bottom: 20px; font-size: 15px; transition: all 0.2s; box-sizing: border-box;
+    }
+    input:focus { outline: none; border-color: var(--secondary); box-shadow: 0 0 0 4px rgba(14, 165, 255, 0.1); }
+    .btn { 
+        width: 100%; padding: 14px; border-radius: 12px; 
+        background: linear-gradient(135deg, var(--secondary), var(--primary)); 
+        color: #fff; border: none; font-weight: 700; cursor: pointer; font-size: 16px;
+        box-shadow: 0 4px 15px rgba(0, 102, 204, 0.3); transition: all 0.3s;
+    }
+    .btn:hover { opacity: 0.9; transform: scale(1.02); box-shadow: 0 6px 20px rgba(0, 102, 204, 0.4); }
+    .small-line { text-align: center; margin-top: 20px; color: #64748b; font-size: 14px; }
+    .small-line a { color: var(--primary); font-weight: 700; text-decoration: none; border-bottom: 2px solid transparent; transition: 0.2s; }
+    .small-line a:hover { border-bottom-color: var(--primary); }
+    .flash { padding: 12px; border-radius: 10px; margin-bottom: 20px; font-weight: 600; text-align: center; font-size: 14px; }
+    .flash-success { background: #dcfce7; color: #166534; }
+    .flash-danger { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Login</h1>
+      <p class="lead">Welcome back! Please login to your account.</p>
+
+      <!-- flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% set category, message = messages[-1] %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endif %}
+      {% endwith %}
+
+      <form id="loginForm" action="{{ url_for('login') }}" method="POST" novalidate>
+        <label for="username">Username or Email</label>
+        <input id="username" name="username" type="text" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required>
+
+        <button id="loginBtn" class="btn" type="submit">Login</button>
+      </form>
+
+      <div class="small-line">
+        New user?
+        <a href="{{ url_for('register') }}">Create an account</a>
+      </div>
+
+      <div class="small-line" style="margin-top:6px;">
+        <a href="{{ forgot_password_url }}">Forgot password?</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // small JS to improve UX: disable button while submitting, keyboard accessibility
+  (function(){
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+
+    loginForm.addEventListener('submit', function(e){
+      // basic client-side check
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      if(!u || !p){
+        e.preventDefault();
+        alert('Please enter username and password');
+        return;
+      }
+      // prevent double submit
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in...';
+    });
+
+    // re-enable button if user changes inputs
+    ['username','password'].forEach(id=>{
+      document.getElementById(id).addEventListener('input', ()=>{
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login';
+      });
+    });
+
+    // allow Enter key to trigger submit from inputs
+    ['username','password'].forEach(id=>{
+      document.getElementById(id).addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){ loginForm.requestSubmit(); }
+      });
+    });
+  })();
+</script>
+</body>
+</html>

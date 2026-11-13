@@ -1,2 +1,5 @@
+<<<<<<< HEAD
 *.dll filter=lfs diff=lfs merge=lfs -text
+=======
+>>>>>>> e91f5c6bd0aeec95f9690823d97ba551af48b68d
 *.h5 filter=lfs diff=lfs merge=lfs -text
