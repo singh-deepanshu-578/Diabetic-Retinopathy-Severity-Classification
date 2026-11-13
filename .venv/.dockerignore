@@ -1,0 +1,8 @@
+Lib/
+Include/
+Scripts/
+__pycache__/
+*.ipynb
+*.pyc
+.git/
+.vercel/

@@ -1,0 +1,7 @@
+.venv/Lib/
+.venv/Include/
+.venv/Scripts/
+.venv/cnn_model_1.h5
+.venv/*.ipynb
+.venv/__pycache__/
+.git/

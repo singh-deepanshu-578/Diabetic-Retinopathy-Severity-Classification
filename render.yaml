@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: dr-analyzer
+    runtime: docker
+    rootDir: .venv
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    region: singapore
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FORGOT_PASSWORD_URL
+        value: "#"
